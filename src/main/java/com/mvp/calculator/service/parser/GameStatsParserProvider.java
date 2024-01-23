@@ -1,5 +1,6 @@
 package com.mvp.calculator.service.parser;
 
+import com.mvp.calculator.exception.UnsupportedGameTypeException;
 import com.mvp.calculator.model.GameType;
 import lombok.experimental.UtilityClass;
 
@@ -16,7 +17,7 @@ public class GameStatsParserProvider {
             case HANDBALL:
                 return handballGameStatsParser;
             default:
-                throw new IllegalArgumentException(String.format("Game type '%s' is not supported", gameType.getValue()));
+                throw new UnsupportedGameTypeException(gameType);
         }
     }
 }
