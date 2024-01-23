@@ -9,10 +9,7 @@ import com.mvp.calculator.service.util.CsvFileUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.EnumUtils;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MvpCalculatorService {
@@ -55,11 +52,22 @@ public class MvpCalculatorService {
     }
 
     private void calculatePlayersRating(GameStats gameStats, Map<String, Integer> playersRating) {
+        String winnerTeamName = getWinnerTeam(gameStats);
+        Set<String> nicknames = new HashSet<>();
+
         for (var playerStats : gameStats.getPlayerGameStats()) {
             var nickname = playerStats.getNickname();
+            if (nicknames.contains(nickname)) {
+                var message = "One player may play in different teams and positions in different games, but not in the same game";
+                throw new InvalidFileContentException(message);
+            }
+            nicknames.add(nickname);
+
             var rating = getRating(gameStats.getType(), playerStats);
 
-            // TODO: add 10 points if team won
+            if (winnerTeamName.equals(playerStats.getTeamName())) {
+                rating += 10;
+            }
 
             if (playersRating.containsKey(nickname)) {
                 var totalPlayerRating = playersRating.get(nickname);
@@ -70,6 +78,24 @@ public class MvpCalculatorService {
         }
     }
 
+    private String getWinnerTeam(GameStats gameStats) {
+        Map<String, Integer> teamPoints = new HashMap<>();
+
+        for (var playerStats : gameStats.getPlayerGameStats()) {
+            var teamName = playerStats.getTeamName();
+            var points = getTeamPoints(gameStats.getType(), playerStats);
+
+            if (teamPoints.containsKey(teamName)) {
+                var totalTeamPoints = teamPoints.get(teamName);
+                points = totalTeamPoints + points;
+            }
+
+            teamPoints.put(teamName, points);
+        }
+
+        return Collections.max(teamPoints.entrySet(), Map.Entry.comparingByValue()).getKey();
+    }
+
     private int getRating(GameType type, PlayerGameStats playerStats) {
         switch (type) {
             case BASKETBALL:
@@ -78,6 +104,19 @@ public class MvpCalculatorService {
             case HANDBALL:
                 var handballPlayerStats = (HandballPlayerGameStats) playerStats;
                 return 2 * handballPlayerStats.getGoalsMade() - handballPlayerStats.getGoalsReceived();
+            default:
+                throw new UnsupportedGameTypeException(type);
+        }
+    }
+
+    private int getTeamPoints(GameType type, PlayerGameStats playerStats) {
+        switch (type) {
+            case BASKETBALL:
+                var basketballPlayerStats = (BasketballPlayerGameStats) playerStats;
+                return basketballPlayerStats.getScoredPoints();
+            case HANDBALL:
+                var handballPlayerStats = (HandballPlayerGameStats) playerStats;
+                return handballPlayerStats.getGoalsMade();
             default:
                 throw new UnsupportedGameTypeException(type);
         }
