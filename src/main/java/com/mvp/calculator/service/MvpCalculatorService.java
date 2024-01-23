@@ -14,22 +14,23 @@ import java.util.stream.Collectors;
 
 public class MvpCalculatorService {
 
-    public void calculateMvp(List<String> fileNames) {
+    public String calculateMvp(String dirPath) {
+        CsvFileUtils.verifyNonCsvFilesAbsentInDirectory(dirPath); // requirement
+        var fileNames = CsvFileUtils.getNamesOfCsvFilesInDirectory(dirPath);
+
         Map<String, Integer> playersRating = new HashMap<>();
 
         var gameStatsList = fileNames.stream()
                 .map(CsvFileUtils::readDataFromCsv)
-                .map(this::parseGameStats)
+                .map(MvpCalculatorService::parseGameStats)
                 .collect(Collectors.toList());
 
         gameStatsList.forEach(gameStats -> calculatePlayersRating(gameStats, playersRating));
 
-        var mvp = Collections.max(playersRating.entrySet(), Map.Entry.comparingByValue()).getKey();
-
-        System.err.printf("%n======= MVP is %s =======%n%n", mvp);
+        return Collections.max(playersRating.entrySet(), Map.Entry.comparingByValue()).getKey();
     }
 
-    private GameStats parseGameStats(List<String[]> rawData) {
+    private static GameStats parseGameStats(List<String[]> rawData) {
         if (CollectionUtils.isEmpty(rawData)) {
             throw new InvalidFileContentException("File is empty");
         }
@@ -51,17 +52,16 @@ public class MvpCalculatorService {
         return parser.parse(rawData);
     }
 
-    private void calculatePlayersRating(GameStats gameStats, Map<String, Integer> playersRating) {
+    private static void calculatePlayersRating(GameStats gameStats, Map<String, Integer> playersRating) {
         String winnerTeamName = getWinnerTeam(gameStats);
         Set<String> nicknames = new HashSet<>();
 
         for (var playerStats : gameStats.getPlayerGameStats()) {
             var nickname = playerStats.getNickname();
-            if (nicknames.contains(nickname)) {
+            if (!nicknames.add(nickname)) {
                 var message = "One player may play in different teams and positions in different games, but not in the same game";
                 throw new InvalidFileContentException(message);
             }
-            nicknames.add(nickname);
 
             var rating = getRating(gameStats.getType(), playerStats);
 
@@ -71,14 +71,14 @@ public class MvpCalculatorService {
 
             if (playersRating.containsKey(nickname)) {
                 var totalPlayerRating = playersRating.get(nickname);
-                rating = totalPlayerRating + rating;
+                rating += totalPlayerRating;
             }
 
             playersRating.put(nickname, rating);
         }
     }
 
-    private String getWinnerTeam(GameStats gameStats) {
+    private static String getWinnerTeam(GameStats gameStats) {
         Map<String, Integer> teamPoints = new HashMap<>();
 
         for (var playerStats : gameStats.getPlayerGameStats()) {
@@ -87,7 +87,7 @@ public class MvpCalculatorService {
 
             if (teamPoints.containsKey(teamName)) {
                 var totalTeamPoints = teamPoints.get(teamName);
-                points = totalTeamPoints + points;
+                points += totalTeamPoints;
             }
 
             teamPoints.put(teamName, points);
@@ -96,7 +96,7 @@ public class MvpCalculatorService {
         return Collections.max(teamPoints.entrySet(), Map.Entry.comparingByValue()).getKey();
     }
 
-    private int getRating(GameType type, PlayerGameStats playerStats) {
+    private static int getRating(GameType type, PlayerGameStats playerStats) {
         switch (type) {
             case BASKETBALL:
                 var basketballPlayerStats = (BasketballPlayerGameStats) playerStats;
@@ -109,7 +109,7 @@ public class MvpCalculatorService {
         }
     }
 
-    private int getTeamPoints(GameType type, PlayerGameStats playerStats) {
+    private static int getTeamPoints(GameType type, PlayerGameStats playerStats) {
         switch (type) {
             case BASKETBALL:
                 var basketballPlayerStats = (BasketballPlayerGameStats) playerStats;
